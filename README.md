@@ -17,3 +17,13 @@ The API call is done via curl, and the command itself is printed before executin
 
 This reference script can be useful in identifying problems in generating the Authorization header value,
 and constructing the set of headers for the request.
+
+### payment-init-and-status.python
+
+A python script demonstrating how to initiate a payment with API in the SANDBOX environment and getting
+the status of the same payment
+
+The script prints intermediate steps and their results while calculating the Authorization header value.
+
+This reference script can be useful in identifying problems in generating the Authorization header value,
+and constructing the set of headers for the request.
