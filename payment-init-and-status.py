@@ -5,11 +5,13 @@ from datetime import datetime
 import json
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
+import urllib.parse
 
 # PUT YOUR API KEY HERE
 API_KEY = ""
 
 SERVER = "https://sandbox.apis.op.fi/paymentbutton"
+SERVER_FRONT = "https://api.smn-sandbox.aws.op-palvelut.fi"
 
 # The SANDBOX will recognise signatures generated with the private
 # key used on the HMAC instructions page
@@ -62,7 +64,7 @@ with open(PRIVATE_KEY_FILE, "rb") as f:
 signature = private_key.sign(SIGNATURE_BASE.encode(), padding.PKCS1v15(), hashes.SHA256()).hex()
 print(f"Signature: {signature}")
 
-print("Launching request")
+print("Launching payment creationg request")
 headers = {
     "Authorization": f"{MERCHANT_ID}:1:0:{signature}",
     "Date": DATE,
@@ -75,10 +77,23 @@ headers = {
 response = requests.post(URL, headers=headers, data=REQUEST_BODY)
 print(f"Response: {response.status_code} {response.reason}\n{response.text}")
 
-
 payment_response = response.json()
 print(json.dumps(payment_response, indent=2))
 
+
+URL = f"{SERVER_FRONT}/customer/payment/startPaymentConfirmation?paymentOperationId={payment_response['paymentOperationId']}&paymentOperationValidation={urllib.parse.quote(payment_response['paymentOperationValidation'])}"
+
+print(f"Launching payment browser flow request to {URL}")
+headers = {
+    "Date": DATE,
+    "Accept": "application/json",
+    "Content-Type": "application/json",
+    "x-session-id": SESSION_ID,
+    "x-request-id": REQUEST_ID,
+    "x-api-key": API_KEY,
+}
+response = requests.get(URL, headers=headers, allow_redirects=False)
+print(f"Response: {response.status_code} {response.reason}\n{response.text}")
 
 
 URL = f"{SERVER}/v1/payments/{payment_response['paymentId']}"
@@ -105,7 +120,7 @@ with open(PRIVATE_KEY_FILE, "rb") as f:
 signature = private_key.sign(SIGNATURE_BASE.encode(), padding.PKCS1v15(), hashes.SHA256()).hex()
 print(f"Signature: {signature}")
 
-print("Launching request")
+print("Launching request to get payment status")
 headers = {
     "Authorization": f"{MERCHANT_ID}:1:0:{signature}",
     "Date": DATE,
@@ -116,4 +131,61 @@ headers = {
     "x-api-key": API_KEY,
 }
 response = requests.get(URL, headers=headers)
+print(f"Response: {response.status_code} {response.reason}\n{response.text}")
+
+
+print("getting all multibank payments providers")
+
+URL = f"{SERVER}/v1/payments/multibank/providers"
+SIGNATURE_BASE = f"""GET
+application/json
+{DATE}
+{MERCHANT_ID}
+{API_KEY}
+{SESSION_ID}
+{REQUEST_ID}
+{URL}
+"""
+
+
+print("\nUsing signature base:")
+print(SIGNATURE_BASE)
+
+with open(PRIVATE_KEY_FILE, "rb") as f:
+    private_key = serialization.load_pem_private_key(f.read(), password=None)
+
+signature = private_key.sign(SIGNATURE_BASE.encode(), padding.PKCS1v15(), hashes.SHA256()).hex()
+print(f"Signature: {signature}")
+
+print("Launching request to get all providers for multibank payments")
+headers = {
+    "Authorization": f"{MERCHANT_ID}:1:0:{signature}",
+    "Date": DATE,
+    "Accept": "application/json",
+    "Content-Type": "application/json",
+    "x-session-id": SESSION_ID,
+    "x-request-id": REQUEST_ID,
+    "x-api-key": API_KEY,
+}
+response = requests.get(URL, headers=headers)
+print(f"Response: {response.status_code} {response.reason}\n{response.text}")
+
+provider_response = response.json()
+print(json.dumps(provider_response, indent=2))
+
+
+bankId = provider_response['providers'][0]['bankId']
+URL = f"{SERVER_FRONT}/customer/payment/multibank/direct/{bankId}/startPaymentConfirmation?paymentOperationId={payment_response['paymentOperationId']}&paymentOperationValidation={urllib.parse.quote(payment_response['paymentOperationValidation'])}"
+
+print(f"Launching request to multibank payment browser flow {URL}")
+headers = {
+    #"Authorization": f"{MERCHANT_ID}:1:0:{signature}",
+    "Date": DATE,
+    "Accept": "application/json",
+    "Content-Type": "application/json",
+    "x-session-id": SESSION_ID,
+    "x-request-id": REQUEST_ID,
+    "x-api-key": API_KEY,
+}
+response = requests.get(URL, headers=headers, allow_redirects=False)
 print(f"Response: {response.status_code} {response.reason}\n{response.text}")
